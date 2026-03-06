@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grok AI | Premium Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #09090b; 
+            color: #e4e4e7;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            background-color: #000000;
+            border-right: 1px solid #27272a;
+            transition: all 0.3s ease;
+        }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
+
+        .premium-btn {
+            background: linear-gradient(135deg, #27272a 0%, #09090b 100%);
+            border: 1px solid #3f3f46;
+            transition: 0.3s;
+        }
+        .premium-btn:hover { border-color: #a1a1aa; background: #18181b; }
+
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .modal-content {
+            background: #18181b;
+            border: 1px solid #27272a;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+            width: 90%;
+            max-width: 420px;
+            border-radius: 28px;
+            padding: 2.5rem;
+            transform: scale(0.95);
+            transition: 0.3s ease;
+        }
+
+        .modal-overlay.active { display: flex; }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .auth-input {
+            background: #09090b;
+            border: 1px solid #27272a;
+            color: white;
+            padding: 14px 18px;
+            border-radius: 14px;
+            width: 100%;
+            outline: none;
+            transition: 0.3s;
+        }
+        .auth-input:focus { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
+
+        .user-msg { background: #27272a; border-radius: 1.2rem 1.2rem 0 1.2rem; }
+        .ai-msg { border-left: 2px solid #3b82f6; padding-left: 1rem; }
+        
+        .ai-content pre { background: #000; padding: 1rem; border-radius: 10px; overflow-x: auto; margin: 10px 0; border: 1px solid #333; }
+        .ai-content code { color: #3b82f6; font-family: monospace; }
+        .ai-content ul { list-style-type: disc; margin-left: 20px; }
+        .ai-content ol { list-style-type: decimal; margin-left: 20px; }
+        .ai-content img { border-radius: 12px; margin-top: 10px; border: 1px solid #333; max-width: 100%; }
+
+        .input-wrapper {
+            background: rgba(24, 24, 27, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid #3f3f46;
+            border-radius: 20px;
+        }
+
+        .glow { box-shadow: 0 0 20px rgba(59, 130, 246, 0.1); }
+        
+        .error-toast {
+            background: #450a0a;
+            border: 1px solid #991b1b;
+            color: #fca5a5;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+            display: none;
+        }
+    </style>
+</head>
+<body class="flex h-screen w-screen">
+
+    <div id="authModal" class="modal-overlay" onclick="closeAuthModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div id="authError" class="error-toast text-center"></div>
+            <div id="loginForm">
+                <h2 class="text-2xl font-bold mb-2 text-white">Welcome back</h2>
+                <p class="text-gray-400 text-sm mb-6">Enter your details to access your account.</p>
+                <div class="space-y-4">
+                    <input type="email" id="loginEmail" placeholder="Email address" class="auth-input">
+                    <input type="password" id="loginPass" placeholder="Password" class="auth-input">
+                    <button onclick="handleLogin()" class="w-full bg-white text-black font-bold py-3.5 rounded-xl hover:bg-gray-200 transition">Sign In</button>
+                </div>
+                <p class="mt-6 text-center text-sm text-gray-400">Don't have an account? <a href="#" onclick="toggleAuth('signup')" class="text-blue-500 hover:underline">Sign up</a></p>
+            </div>
+            <div id="signupForm" class="hidden">
+                <h2 class="text-2xl font-bold mb-2 text-white">Create account</h2>
+                <div class="space-y-4">
+                    <input type="text" id="regName" placeholder="Full Name" class="auth-input">
+                    <input type="email" id="regEmail" placeholder="Email address" class="auth-input">
+                    <input type="password" id="regPass" placeholder="Password" class="auth-input">
+                    <button onclick="handleSignup()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl hover:bg-blue-700 transition">Create Account</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <aside class="sidebar w-72 h-full hidden md:flex flex-col p-4">
+        <button onclick="newChat()" class="premium-btn w-full flex items-center justify-between p-3 rounded-xl mb-6 font-medium">
+            <span>New Chat</span>
+            <i data-lucide="plus" class="w-4 h-4"></i>
+        </button>
+
+        <div class="flex-1 overflow-y-auto space-y-2 text-sm text-gray-400">
+            <p class="px-2 pb-2 text-xs font-semibold uppercase text-gray-600">Lifetime History</p>
+            <div id="history-container">
+                </div>
+        </div>
+
+        <div class="border-t border-gray-800 pt-4 mt-4" id="profileArea">
+            <div class="flex items-center gap-3 p-2 hover:bg-[#18181b] rounded-lg cursor-pointer">
+                <div id="userAvatar" class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-xs font-bold uppercase text-white">?</div>
+                <div class="flex flex-col overflow-hidden">
+                    <span id="profileName" class="text-sm font-medium truncate">Guest User</span>
+                    <span id="profileEmail" class="text-[10px] text-gray-500 truncate italic">Not signed in</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative h-full">
+        <header class="p-4 flex justify-between items-center bg-transparent border-b border-white/5">
+            <div class="md:hidden"><i data-lucide="menu"></i></div>
+            <div class="font-semibold text-lg tracking-tight">Grok <span class="text-blue-500">AI</span></div>
+            <div class="flex items-center gap-4" id="navButtons">
+                <button onclick="openAuthModal('login')" class="text-sm font-medium text-gray-400 hover:text-white transition px-4 py-2">Login</button>
+                <button onclick="openAuthModal('signup')" class="text-sm font-medium bg-white text-black px-5 py-2 rounded-full hover:bg-gray-200 transition">Get Started</button>
+            </div>
+        </header>
+
+        <div id="chat-box" class="flex-1 overflow-y-auto p-6 space-y-8 scroll-smooth max-w-4xl mx-auto w-full">
+            <div class="h-full flex flex-col items-center justify-center space-y-6 opacity-50" id="welcome-screen">
+                <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                    <i data-lucide="command" class="text-black w-8 h-8"></i>
+                </div>
+                <h2 class="text-3xl font-light italic">World Knowledge at your fingertips.</h2>
+            </div>
+        </div>
+
+        <div class="p-6 w-full max-w-4xl mx-auto">
+            <div class="input-wrapper glow flex items-end p-3 gap-3">
+                <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleFileUpload(event)">
+                <button onclick="document.getElementById('file-input').click()" class="p-2 text-gray-400 hover:text-white transition">
+                    <i data-lucide="paperclip"></i>
+                </button>
+                
+                <textarea id="user-input" rows="1" placeholder="Ask me anything in the world..." 
+                    class="bg-transparent flex-1 outline-none resize-none py-2 text-md leading-relaxed"
+                    oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"></textarea>
+                
+                <button onclick="sendMessage()" id="send-btn" class="bg-white text-black p-2.5 rounded-xl hover:scale-105 active:scale-95 transition shadow-lg">
+                    <i data-lucide="arrow-up" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <p class="text-[10px] text-gray-600 text-center mt-3 tracking-widest uppercase">Powered by xAI & GPT-4o Intelligence</p>
+        </div>
+    </main>
+
+    <script>
+        lucide.createIcons();
+
+        // 1. New Chat Function (Screen Saaf Karega)
+        function newChat() {
+            const chatBox = document.getElementById('chat-box');
+            chatBox.innerHTML = `
+                <div class="h-full flex flex-col items-center justify-center space-y-6 opacity-50" id="welcome-screen">
+                    <div class="w-16 h-16 bg-white rounded-full flex items-center justify-center">
+                        <i data-lucide="command" class="text-black w-8 h-8"></i>
+                    </div>
+                    <h2 class="text-3xl font-light italic">Start a fresh conversation.</h2>
+                </div>`;
+            lucide.createIcons();
+            loadHistory(); // Refresh sidebar history
+        }
+
+        // 2. Load History from Backend
+        async function loadHistory() {
+            try {
+                const res = await fetch('/get_history');
+                const data = await res.json();
+                const container = document.getElementById('history-container');
+                container.innerHTML = '';
+                data.forEach(item => {
+                    container.innerHTML += `
+                        <div class="p-2 hover:bg-[#18181b] rounded-lg cursor-pointer flex items-center gap-2 truncate">
+                            <i data-lucide="message-square" class="w-3 h-3"></i> ${item.title}
+                        </div>`;
+                });
+                lucide.createIcons();
+            } catch (e) { console.log("History error"); }
+        }
+
+        // 3. Handle Gallery Upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const chatBox = document.getElementById('chat-box');
+                chatBox.innerHTML += `
+                    <div class="flex justify-end mb-4">
+                        <div class="user-msg p-2 shadow-xl">
+                            <img src="${URL.createObjectURL(file)}" class="max-w-[200px] rounded-lg">
+                            <p class="text-[10px] mt-1 text-gray-400">Photo Uploaded</p>
+                        </div>
+                    </div>`;
+                // Backend ko bhejne ke liye code yahan add hoga
+            }
+        }
+
+        // 4. Update UI with auth (Same logic)
+        function updateUI(user) {
+            if (!user) return;
+            document.getElementById('profileName').innerText = user.name;
+            document.getElementById('profileEmail').innerText = user.email;
+            document.getElementById('userAvatar').innerText = user.name.charAt(0);
+            document.getElementById('navButtons').innerHTML = `<span class="text-xs bg-green-900/30 text-green-500 px-3 py-1 rounded-full border border-green-500/20">Authorized</span>`;
+        }
+
+        // 5. Send Message Logic
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const chatBox = document.getElementById('chat-box');
+            const welcome = document.getElementById('welcome-screen');
+            if (!input.value.trim()) return;
+            if (welcome) welcome.remove();
+            
+            const userText = input.value;
+            input.value = '';
+            input.style.height = 'auto';
+
+            chatBox.innerHTML += `<div class="flex justify-end mb-4"><div class="user-msg max-w-[80%] p-4 text-sm shadow-xl">${userText}</div></div>`;
+            const loadingId = "load-" + Date.now();
+            chatBox.innerHTML += `<div id="${loadingId}" class="ai-msg max-w-[90%] text-sm text-gray-400 animate-pulse mb-6 text-blue-400 italic">Thinking...</div>`;
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: userText})
+                });
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+
+                const formattedResponse = marked.parse(data.response);
+                chatBox.innerHTML += `
+                    <div class="ai-msg max-w-[90%] text-sm leading-7 text-gray-200 mb-6">
+                        <div class="font-bold text-xs text-blue-500 mb-2 tracking-widest uppercase">GROK AI RESPONSE</div>
+                        <div class="ai-content">${formattedResponse}</div>
+                    </div>`;
+                loadHistory(); // Update sidebar after chat
+            } catch (error) {
+                document.getElementById(loadingId).innerText = "Connection Error!";
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+            lucide.createIcons();
+        }
+
+        // Init loads
+        window.onload = () => {
+            loadHistory();
+            const savedUser = JSON.parse(localStorage.getItem('currentUser'));
+            if (savedUser) updateUI(savedUser);
+        };
+
+        // Remaining Auth functions (handleLogin, handleSignup etc.) from your previous code stay here...
+        const getUsers = () => JSON.parse(localStorage.getItem('grok_users') || '[]');
+        const saveUser = (user) => { const users = getUsers(); users.push(user); localStorage.setItem('grok_users', JSON.stringify(users)); };
+        function openAuthModal(mode) { document.getElementById('authModal').classList.add('active'); toggleAuth(mode); }
+        function closeAuthModal() { document.getElementById('authModal').classList.remove('active'); }
+        function toggleAuth(mode) { 
+            const loginForm = document.getElementById('loginForm'); 
+            const signupForm = document.getElementById('signupForm');
+            if (mode === 'signup') { loginForm.classList.add('hidden'); signupForm.classList.remove('hidden'); }
+            else { loginForm.classList.remove('hidden'); signupForm.classList.add('hidden'); }
+        }
+        function handleSignup() {
+            const name = document.getElementById('regName').value;
+            const email = document.getElementById('regEmail').value;
+            const pass = document.getElementById('regPass').value;
+            if (name && email && pass) { saveUser({name, email, pass}); loginUser({name, email, pass}); }
+        }
+        function handleLogin() {
+            const email = document.getElementById('loginEmail').value;
+            const pass = document.getElementById('loginPass').value;
+            const user = getUsers().find(u => u.email === email && u.pass === pass);
+            if (user) loginUser(user);
+        }
+        function loginUser(user) { localStorage.setItem('currentUser', JSON.stringify(user)); updateUI(user); closeAuthModal(); }
+
+        document.getElementById('user-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+    </script>
+</body>
+</html>
